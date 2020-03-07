@@ -49,8 +49,11 @@ Just specify both `db-primaryokey` and `db-max-id`
 It won't be able to divide up the dumpfiles into equal number of rows though.
 
 Save to a file
+
 ``` mysql-dump-chunks db1.example.com wp_db wp_options db_user sw0rdfish > dump.sh ```
+
 Or pipe to shell
+
 ``` mysql-dump-chunks db1.example.com wp_db wp_options db_user sw0rdfish | sh ```
 
 ### Prerequisites
