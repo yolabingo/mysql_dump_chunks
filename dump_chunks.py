@@ -9,7 +9,6 @@
 import argparse
 import logging
 import os
-import sys
 
 try:
     import MySQLdb
@@ -38,7 +37,6 @@ class MysqlChunks():
              pk="",
              chunk_count=10,
              output_dir="",
-             mysqldump_script_file="",
              verbose=False,
              db_max_id=0,
          ):
@@ -60,19 +58,13 @@ class MysqlChunks():
         self.db = db
         self.password = password
         self.table = table
+        self.pk = pk
         self.chunk_count = chunk_count
         self.db_max_id = db_max_id
-
         if not output_dir: 
             output_dir = "./"
         self.output_dir = os.path.abspath(output_dir)
-
-        if not mysqldump_script_file:
-            mysqldump_script_file = f"mysqldump-{host}-{db}-{table}"
-        self.mysqldump_script_file = os.path.abspath(mysqldump_script_file)
-
         self._log(verbose)
-        self._validate_params()
         self._get_pk(pk)
         chunks = self._get_chunks() 
         self._mysqldump_template(chunks)
@@ -80,7 +72,7 @@ class MysqlChunks():
 
     def _mysqldump_template(self, chunks):
         """writes mysqldump commands to file""" 
-        output = "#!/bin/bash\n"
+        output = "#!/bin/sh\n"
         mysqldump = f"mysqldump --opt --order-by-primary --compress -h {self.host} -u {self.user} -p'{self.password}'"
         no_create = ""
         file_count = 1
@@ -92,7 +84,6 @@ class MysqlChunks():
             id_range = f'-w"{self.table}.{self.pk}>={start} AND {self.table}.{self.pk}<{end}"'
             output += f"{mysqldump} {no_create} {id_range} -r {sql_file} {self.db} {self.table} \n"
             output += f"echo 'dumped {sql_file}' \n"
-            output += "sleep 1 \n"
             file_count += 1
             no_create = "--skip-add-drop-table --no-create-info"
             start = end
@@ -100,11 +91,8 @@ class MysqlChunks():
         id_range = f'-w"{self.table}.{self.pk}>={end}"'
         output += f"{mysqldump} {no_create} {id_range} -r {sql_file} {self.db} {self.table} \n"
         output += f"echo 'dumped {sql_file}' \n"
-        with open(self.mysqldump_script_file, "w") as f:
-            f.write(output)
-        os.chmod(self.mysqldump_script_file, 0o755)
-        print("mysqldump file ready:")
-        print(f"  {self.mysqldump_script_file}")
+        print(output)
+        print("")
 
 
     def _get_chunks(self):
@@ -112,68 +100,66 @@ class MysqlChunks():
 
         for example [1, 1900, 4532, 7222]
         """
-        try:
+        cursor = self._db_connect().cursor()
+        if cursor is not None:
             try:
-                cursor = self._db_connect().cursor()
                 cursor.execute(f"SELECT {self.pk} FROM {self.table} ORDER BY {self.pk}")
                 keys = [i[0] for i in cursor.fetchall()]
-                logging.info(f"{len(keys)} rows in table '{self.table}'")
+                logging.info(f"  {len(keys)} rows in table '{self.table}'")
             except (MySQLdb._exceptions.OperationalError,
                     MySQLdb._exceptions.ProgrammingError,) as e: 
-                logging.info(f"unable to query database: {e}")
-                logging.info(f"so using db_max_id provided")
-        except NameError:
-            # mysqlclient is not installed
+                logging.info(f"  unable to query database: {e}")
+                logging.info(f"  so using db_max_id provided")
+        else:
             keys = [i for i in range(self.db_max_id)]
-
+            logging.warning(f"  MySQLdb not found so using range(max_id) to create list of keys")
         if len(keys) < 10000:
-            logging.warning(f"db table only has {len(keys)} rows - perhaps this won't be useful")
+            logging.warning(f"  db table only has {len(keys)} rows - perhaps this won't be useful")
         if len(keys) <= (self.chunk_count):
             raise MysqlChunkException("chunk_count must be greater than total table rows so bailing...")
         # divide the list of keys into equal-sized chunks
         chunk_size = int(len(keys) / self.chunk_count)
         chunks = keys[::chunk_size]
         chunks[0] = 1
-        logging.info(f"total rows: {len(keys)}")
-        logging.info(f"chunk_size: {chunk_size}")
-        logging.info(f"chunks: {chunks}")
+        logging.info(f"  total rows: {len(keys)}")
+        logging.info(f"  chunk_size: {chunk_size}")
+        logging.info(f"  chunks: {chunks}")
         return chunks
             
 
     def _get_pk(self, pk):
         """query db to find primary key column if it wasn't provided as a parameter"""
+        db = self._db_connect()
         if pk:
             self.pk = pk
-        else:
-            logging.info("primary key not specified so querying the db for it")
+        elif db:
+            logging.info("  primary key not specified so querying the db for it")
             try:
-                db = self._db_connect()
                 db.query(f"SHOW KEYS FROM {self.table} WHERE Key_name = 'PRIMARY'")
                 result = db.store_result().fetch_row(how=1)
                 self.pk = result[0]["Column_name"]
-                logging.info(f"found table primary key '{self.pk}' for '{self.table}'")
+                logging.info(f"  found table primary key '{self.pk}' for '{self.table}'")
             except (MySQLdb._exceptions.OperationalError,
                     MySQLdb._exceptions.ProgrammingError,) as e: 
                 raise MysqlChunkException(f"mysql error {e}")
+        else:
+            logging.warning("  either primary key parameter or MySQL support required")
+            logging.warning("  in order to create mysqldump commands that use pk ranges")
         if not self.pk:
-            raise MysqlChunkException("db table primary key required, bailing...")
+            raise MysqlChunkException("  db table primary key required, bailing...")
 
 
     def _db_connect(self):
-        return MySQLdb.connect(host=self.host, db=self.db, user=self.user, passwd=self.password)
+        """ returns None if MySQLdb is not installed """
+        try:
+            db = MySQLdb.connect(host=self.host, db=self.db, user=self.user, passwd=self.password)
+        except NameError:
+            db = None
 
-
-    def _validate_params(self):
-        """required paramaters"""
-        for i in [self.host, self.user, self.db, self.password, self.table]:
-            if not i:
-                msg = "These paramaters are required, one was missing\n"
-                msg += f"self.host: {self.host}\n"
-                msg += f"self.user: {self.user}\n"
-                msg += f"self.db: {self.db}\n"
-                msg += f"self.password: {self.password}\n"
-                msg += f"self.table: {self.table}\n"
-                raise MysqlChunkException(msg)
+        except (MySQLdb._exceptions.OperationalError,
+                MySQLdb._exceptions.ProgrammingError,) as e: 
+            raise MysqlChunkException(e)
+        return db
 
 
     def _log(self, verbose, debug=False):
@@ -194,7 +180,6 @@ if __name__ == "__main__":
     parser.add_argument("-c", "--dumpfile-count", default=10, type=int, help="number of .sql dump files to create, default=10")
     parser.add_argument("-i", "--db-primary-key", default=None, help="table primary key column - can be introspected")
     parser.add_argument("-o", "--output-dir", default="./", help="output dir for .sql files, default='./'")
-    parser.add_argument("-f", "--mysqldump-script-file", default="", help="file to save mysqldump commands")
     parser.add_argument("-v", "--verbose", default=False, action="store_true", help="verbose output")
     # max_id = 0 means we query the DB and generate equal-size sql files
     # specify max ID to avoid MySQL query, but sql files may vary in size 
@@ -219,10 +204,8 @@ if __name__ == "__main__":
                      chunk_count=args.dumpfile_count,
                      output_dir=args.output_dir,
                      verbose=args.verbose,
-                     mysqldump_script_file=args.mysqldump_script_file,
                      db_max_id=args.db_max_id,
                  )
      
     except MysqlChunkException as e:
         logging.error(e)
-        sys.exit(1)
