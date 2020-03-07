@@ -52,7 +52,7 @@ Save to a file
 
 ``` mysql-dump-chunks db1.example.com wp_db wp_options db_user sw0rdfish > dump.sh ```
 
-Or pipe to shell
+Or pipe to shell to run immediately
 
 ``` mysql-dump-chunks db1.example.com wp_db wp_options db_user sw0rdfish | sh ```
 
