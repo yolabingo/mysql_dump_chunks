@@ -114,4 +114,4 @@ Or invoke those binaries directly
 
 ## Authors
 
-* **toddj@swcp.com** - (https://gitlab.swcp.com/toddj/mysql-dump-chunks)
+* **yolabingo** - (https://github.com/yolabingo/mysql_dump_chunks)
