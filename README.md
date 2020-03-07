@@ -4,7 +4,7 @@ Creates a mysqldump shell script that breaks up a large database table into mana
 
 ### Usage
 ```
-usage: mysql-dump-chunks [-h] [-c DUMPFILE_COUNT] [-i DB_PRIMARY_KEY]
+usage: dump_chunks [-h] [-c DUMPFILE_COUNT] [-i DB_PRIMARY_KEY]
                          [-o OUTPUT_DIR] [-f MYSQLDUMP_SCRIPT_FILE] [-v]
                          [-m DB_MAX_ID]
                          server database table user password
