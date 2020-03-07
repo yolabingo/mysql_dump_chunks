@@ -4,10 +4,9 @@ Creates a mysqldump shell script that breaks up a large database table into mana
 
 ### Usage
 ```
-usage: dump_chunks [-h] [-c DUMPFILE_COUNT] [-i DB_PRIMARY_KEY]
-                         [-o OUTPUT_DIR] [-f MYSQLDUMP_SCRIPT_FILE] [-v]
-                         [-m DB_MAX_ID]
-                         server database table user password
+usage: dump_chunks.py [-h] [-c DUMPFILE_COUNT] [-i DB_PRIMARY_KEY]
+                      [-o OUTPUT_DIR] [-v] [-m DB_MAX_ID]
+                      server database table user password
 
 create mysqldump commands to dump a large database table in chunks
 
@@ -26,8 +25,6 @@ optional arguments:
                         table primary key column - can be introspected
   -o OUTPUT_DIR, --output-dir OUTPUT_DIR
                         output dir for .sql files, default='./'
-  -f MYSQLDUMP_SCRIPT_FILE, --mysqldump-script-file MYSQLDUMP_SCRIPT_FILE
-                        file to save mysqldump commands
   -v, --verbose         verbose output
   -m DB_MAX_ID, --db-max-id DB_MAX_ID
                         approx value of the max primary key, 0==introspect
@@ -35,21 +32,26 @@ optional arguments:
 #### Examples
 Save wp_options table
 
-``` mysql-dump-chunks moru toddj_wp wp_options toddj_wp sw0rdfish ```
+``` mysql-dump-chunks db1.example.com wp_db wp_options db_user sw0rdfish ```
 
 Save wp_options table as 5 separate dump files
 
-``` mysql-dump-chunks moru toddj_wp wp_options toddj_wp sw0rdfish --dumpfile-count 5 ```
+``` mysql-dump-chunks db1.example.com wp_db wp_options db_user sw0rdfish --dumpfile-count 5 ```
 
 Save wp_options table, use /tmp/dump/ as dumpfile destination directory
 
-``` mysql-dump-chunks moru toddj_wp wp_options toddj_wp sw0rdfish --output-dir /tmp/dump ```
+``` mysql-dump-chunks db1.example.com wp_db wp_options db_user sw0rdfish --output-dir /tmp/dump ```
 
 Running without Python Mysql support? 
 
 Just specify both `db-primaryokey` and `db-max-id`
 
 It won't be able to divide up the dumpfiles into equal number of rows though.
+
+Save to a file
+``` mysql-dump-chunks db1.example.com wp_db wp_options db_user sw0rdfish > dump.sh ```
+Or pipe to shell
+``` mysql-dump-chunks db1.example.com wp_db wp_options db_user sw0rdfish | sh ```
 
 ### Prerequisites
 
