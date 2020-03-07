@@ -1,5 +1,5 @@
 # MySQL DumpChunks
-Creates a mysqldump shell script that breaks up a large database table into managable chunks for nicer imports and exports
+Creates a mysqldump shell script that breaks up a large database table into smaller chunks
 
 
 ### Usage
